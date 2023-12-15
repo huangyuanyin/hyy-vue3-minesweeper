@@ -1,15 +1,8 @@
 <script setup lang="ts" generic="T extends any, O extends any">
-interface BlockState {
-  x?: Number; // x 坐标
-  y?: Number; // y 坐标
-  revealed: Boolean; // 是否翻开
-  mine?: Boolean; // 是否是地雷
-  flag?: Boolean; // 是否插旗
-  adjacentMines: Number; // 周围地雷数量
-}
+import type { BlockState } from "~/types";
 
-const WIDTH = 10;
-const HEIGHT = 10;
+const WIDTH = 5;
+const HEIGHT = 5;
 const state = ref(
   Array.from({ length: HEIGHT }, (_, y) =>
     Array.from(
@@ -59,7 +52,6 @@ function generateMines(initial: BlockState) {
   updateNumbers();
 }
 
-
 // 更新数字
 function updateNumbers() {
   state.value.forEach((row) => {
@@ -95,13 +87,18 @@ function expendZero(block: BlockState) {
   });
 }
 
-let mineGenerator = false;
-let dev = true;
+let mineGenerated = false;
+let dev = false;
+
+function onRightClick(block: BlockState) {
+  if (block.revealed) return;
+  block.flagged = !block.flagged;
+}
 
 function onClick(block: BlockState) {
-  if (!mineGenerator) {
+  if (!mineGenerated) {
     generateMines(block);
-    mineGenerator = true;
+    mineGenerated = true;
   }
   block.revealed = true; // 翻开
   // 是地雷
@@ -112,8 +109,21 @@ function onClick(block: BlockState) {
 }
 
 function getBlockClass(block: BlockState) {
-  if (!block.revealed) return "bg-gray/10";
+  if (block.flagged) return "bg-gray-500/10";
+  if (!block.revealed) return "bg-gray-500/10 hover:bg-gray-500/20";
   return block.mine ? "bg-red-500/50" : numberColors[block.adjacentMines];
+}
+
+watchEffect(checkGameState);
+
+function checkGameState() {
+  if (!mineGenerated) return;
+  const blocks = state.value.flat();
+  if (blocks.every((block) => block.revealed || block.flagged)) {
+    if (blocks.some((block) => block.flagged && !block.mine))
+      alert("You cheat!");
+    else alert("You Win!");
+  }
 }
 </script>
 
@@ -139,11 +149,14 @@ function getBlockClass(block: BlockState) {
           h-10
           m="0.5"
           border="1 gray-400/10"
-          hover="bg-gray/10"
           :class="getBlockClass(block)"
           @click="onClick(block)"
+          @contextmenu.prevent="onRightClick(block)"
         >
-          <template v-if="block.revealed || dev">
+          <template v-if="block.flagged">
+            <div i-mdi-flag text-red></div>
+          </template>
+          <template v-else-if="block.revealed || dev">
             <div v-if="block.mine" i-mdi-mine></div>
             <div v-else>
               {{ block.adjacentMines }}
